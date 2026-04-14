@@ -1,0 +1,19 @@
+import { Link } from 'react-router-dom';
+
+export default function Header() {
+  return (
+    <header>
+      <div className="header-container">
+        <div className="header-text">tarassum</div>
+        <nav>
+          <ul>
+            <li><Link to="/">Home</Link></li>
+            <li><Link to="/view">View Map</Link></li>
+            <li className="hide-on-mobile"><Link to="/make">Make Map</Link></li>
+            <li><Link to="/about">About</Link></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+  );
+}

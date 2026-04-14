@@ -1,0 +1,400 @@
+@import "tailwindcss";
+
+@theme {
+  --color-sidebar: #ffffff;
+  --color-sidebar-hover: #f5f5f5;
+  --color-sidebar-border: #e0e0e0;
+  --color-accent: #000000;
+  --color-accent-hover: #333333;
+  --color-muted: #888;
+  --color-surface: #f5f5f5;
+}
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  width: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+}
+
+html, body {
+  height: 100%;
+}
+
+/* Links */
+a {
+  color: black;
+  text-decoration: underline;
+}
+
+a:hover {
+  color: #666;
+  text-decoration: underline;
+}
+
+/* Header */
+header {
+  width: 100%;
+}
+
+.header-text {
+  text-align: center;
+  font-size: 4rem;
+  font-weight: bold;
+}
+
+.header-container {
+  max-width: 1200px;
+  margin: auto;
+  padding: 20px;
+}
+
+/* Nav: scoped to header */
+.header-container nav {
+  text-align: center;
+  padding-top: 20px;
+}
+
+.header-container nav ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.header-container nav ul a {
+  text-decoration: none;
+  color: black;
+}
+
+.header-container nav ul a:hover {
+  text-decoration: underline;
+}
+
+.header-container nav li {
+  float: left;
+  padding: 0px 10px;
+}
+
+@media (max-width: 768px) {
+  .header-container {
+    padding: 8px 12px;
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+  }
+  .header-text {
+    font-size: 1.5rem;
+    text-align: left;
+    flex-shrink: 0;
+    line-height: 1;
+    display: flex;
+    align-items: flex-end;
+  }
+  .header-container nav {
+    padding-top: 0;
+    flex: 1;
+    display: flex;
+    align-items: flex-end;
+    padding-bottom:1px;
+  }
+  .header-container nav ul {
+    justify-content: flex-start;
+    align-items: flex-end;
+    gap: 4px;
+    line-height: 1;
+  }
+  .header-container nav li {
+    float: none;
+    padding: 0 6px;
+    font-size: 1rem;
+    display: flex;
+    align-items: flex-end;
+    line-height: 1;
+  }
+  .hide-on-mobile {
+    display: none !important;
+  }
+
+  /* Hide Leaflet zoom buttons on mobile (use pinch zoom instead) */
+  .leaflet-control-zoom {
+    display: none !important;
+  }
+
+  /* Compact footer on mobile */
+  footer {
+    flex: 0 0 auto;
+    height: auto;
+    margin: 0;
+  }
+  .div-footer {
+    padding: 6px 8px;
+    height: auto !important;
+  }
+  footer {
+    height:auto !important;
+    margin: 0 !important;
+    flex: 0 0 50px !important;
+  }
+  .footer-link-container a {
+    margin: 0 8px;
+  }
+  .footer-link-container img {
+    width: 14px;
+    height: 14px;
+  }
+
+}
+
+/* Content lists: scoped to layout pages only */
+.container ul {
+  list-style-type: none;
+  padding-left: 20px;
+}
+
+.container ul li {
+  margin-bottom: 1rem;
+}
+
+/* Typography: scoped to layout pages only */
+.container h2 {
+  font-size: 1.5em;
+  font-weight: bold;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+.container h3 {
+  font-size: 1.17em;
+  font-weight: bold;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+.container p {
+  margin-top: 0;
+  margin-bottom: 1em;
+  line-height: 1.6;
+}
+
+em {
+  font-style: italic;
+}
+
+/* Container */
+.container {
+  width: 100%;
+  padding: 20px 20px;
+  box-sizing: border-box;
+  margin:auto;
+}
+
+.main {
+  width: 100%;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 20px 16px;
+  }
+}
+
+/* Footer */
+footer {
+  margin-top: auto;
+  flex: 0 0 100px;
+  max-width: 100%;
+  margin: 20px;
+}
+
+.div-footer {
+  text-align: center;
+  padding-top: 12.5px;
+  width: 100%;
+  margin: auto;
+  position: relative;
+}
+
+.footer-link-container {
+  text-align: center;
+  width: 100%;
+  padding: 10px 0;
+}
+
+.footer-link-container a {
+  margin: 20px;
+  text-decoration: none;
+}
+
+.footer-link-container img {
+  display: inline;
+  width: 20px;
+  height: 20px;
+  vertical-align: middle;
+}
+
+.footer-link-container a:hover {
+  text-decoration: underline;
+}
+
+/* Blockquote */
+blockquote {
+  border-left: 3px solid #ccc;
+  padding-left: 1rem;
+  margin-left: 0;
+  margin-top: 0.5em;
+  margin-bottom: 1em;
+  color: #444;
+  line-height: 1.6;
+}
+
+/* Layout: flex column. Default keeps document flow so the page scrollbar is on the viewport.
+   The .layout-fullheight modifier locks to viewport height for the View Map. */
+.layout-flex {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.layout-flex.layout-fullheight {
+  height: 100dvh;
+  min-height: 0;
+}
+
+.layout-flex > .container {
+  flex: 1;
+}
+
+.layout-flex.layout-fullheight > .container {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.main-fullheight {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+}
+
+.main-fullheight > * {
+  flex: 1;
+  min-height: 0;
+}
+
+/* View map: fills space between header and footer */
+.view-map-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.view-map-container.view-map-fullscreen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 2000;
+}
+
+.view-map {
+  width: 100%;
+  height: 100%;
+}
+
+/* Leaflet zoom control: smaller buttons, only color + cursor change on hover */
+.leaflet-bar a.leaflet-control-zoom-in,
+.leaflet-bar a.leaflet-control-zoom-out {
+  width: 24px;
+  height: 24px;
+  line-height: 24px;
+  font-size: 16px;
+  padding: 0;
+  box-sizing: border-box;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.leaflet-bar a.leaflet-control-zoom-in:hover,
+.leaflet-bar a.leaflet-control-zoom-out:hover,
+.leaflet-bar a.leaflet-control-zoom-in:focus,
+.leaflet-bar a.leaflet-control-zoom-out:focus {
+  width: 24px;
+  height: 24px;
+  line-height: 24px;
+  font-size: 16px;
+  padding: 0;
+  box-sizing: border-box;
+  text-decoration: none;
+  color: #666;
+}
+
+/* Leaflet overrides */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: #fff;
+}
+
+.leaflet-control-attribution {
+  font-size: 10px !important;
+  opacity: 0.7;
+  display: none;
+}
+
+/* Custom city marker labels */
+.city-label {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  white-space: nowrap;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+}
+
+/* Crosshair cursor for placement mode */
+.placement-mode {
+  cursor: crosshair !important;
+}
+.placement-mode .leaflet-container {
+  cursor: crosshair !important;
+}
+
+/* Legend overlay on map */
+.legend-overlay {
+  position: absolute;
+  z-index: 1000;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: move;
+  user-select: none;
+  pointer-events: auto;
+}
+
+/* Grayscale tile filter for terrain heightmap look */
+.grayscale-tiles {
+  filter: grayscale(1) contrast(1.1);
+}
+
+
+/* Scrollbar styling for sidebar */
+.sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
+}
