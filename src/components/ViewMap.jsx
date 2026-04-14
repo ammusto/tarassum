@@ -22,7 +22,7 @@ const TILE_LAYERS = {
   },
 };
 
-// Shape + color + size per type
+// Shape + color + size per type (desktop uses shape differentiation)
 const TYPE_STYLES = {
   metropoles: { shape: 'circle', color: '#000000', size: 6 },
   capitals: { shape: 'square', color: '#333333', size: 5 },
@@ -32,6 +32,31 @@ const TYPE_STYLES = {
   xroads: { shape: 'cross', color: '#888888', size: 5 },
   waters: { shape: 'circle', color: '#4a90d9', size: 5 },
   sites: { shape: 'circle', color: '#666666', size: 4 },
+};
+
+// Mobile: all nodes are circles, so color is the only distinguishing cue.
+// Every value below is unique. Keep in sync with the legend render below.
+const MOBILE_TYPE_COLORS = {
+  metropoles: '#000000',
+  capitals: '#222222',
+  towns: '#444444',
+  waystations: '#666666',
+  villages: '#888888',
+  xroads: '#999999',
+  waters: '#aaaaaa',
+  sites: '#cccccc',
+};
+
+// Mobile-specific radii for circleMarkers and legend swatches (independent of TYPE_STYLES.size).
+const MOBILE_TYPE_SIZES = {
+  metropoles: 5,
+  capitals: 4,
+  towns: 4,
+  waystations: 4,
+  villages: 4,
+  waters: 4,
+  xroads: 4,
+  sites: 4,
 };
 
 // Display names for legend
@@ -117,6 +142,9 @@ export default function ViewMap() {
   const routesLayerRef = useRef(null);
   const watersLayerRef = useRef(null);
   const bordersLayerRef = useRef(null);
+  const placeMarkersRef = useRef([]); // [{ marker, place }]
+  const routeLinesRef = useRef([]); // [{ polyline, startRegion, endRegion }]
+  const iconCacheRef = useRef(new Map());
   const [data, setData] = useState(null);
   const [activeLayer, setActiveLayer] = useState('terrain');
   const [showWaters, setShowWaters] = useState(false);
@@ -236,25 +264,31 @@ export default function ViewMap() {
 
     const placeById = {};
     for (const p of data.places) placeById[p.id] = p;
-    const regionColor = (regionId) =>
-      (regionId && data.regions?.[regionId]?.color) || NO_REGION_COLOR;
 
-    // Draw all routes
+    // Build routes once with default color; showRegions effect recolors them in place
+    const routeLines = [];
     for (const route of data.routes) {
       const latLngs = route.coords.map(c => [c[1], c[0]]);
-      let color = ROUTE_COLOR;
-      if (showRegions) {
-        const startPlace = placeById[route.s];
-        const endPlace = placeById[route.e];
-        const sameRegion = startPlace && endPlace && startPlace.region && startPlace.region === endPlace.region;
-        color = sameRegion ? regionColor(startPlace.region) : (startPlace ? regionColor(startPlace.region) : ROUTE_COLOR);
-      }
-      L.polyline(latLngs, { color, weight: 1.5, opacity: showRegions ? 0.7 : 0.5 }).addTo(routesLayer);
+      const startPlace = placeById[route.s];
+      const endPlace = placeById[route.e];
+      const polyline = L.polyline(latLngs, {
+        color: ROUTE_COLOR,
+        weight: 1.5,
+        opacity: 0.5,
+      }).addTo(routesLayer);
+      routeLines.push({
+        polyline,
+        startRegion: startPlace?.region || null,
+        endRegion: endPlace?.region || null,
+      });
     }
+    routeLinesRef.current = routeLines;
 
-    // Create all markers grouped by tier
+    // Create all markers grouped by tier. Build with default (non-region) colors;
+    // showRegions effect will swap icons in place without rebuilding.
     const markersByTier = {};
     const labelsByTier = {};
+    const placeMarkers = [];
     for (const place of data.places) {
       if (place.type === 'regions' || place.type === 'quarters' || place.type === 'xroads') continue;
 
@@ -266,10 +300,28 @@ export default function ViewMap() {
       const typeLabel = place.type ? place.type.charAt(0).toUpperCase() + place.type.slice(1) : '';
       const popupContent = `<div style="font-size:14px"><strong>${displayName}</strong>${place.nameAr ? `<br><span dir="rtl" style="font-size:18px;font-family:'Noto Naskh Arabic',serif;line-height:1.6">${place.nameAr}</span>` : ''}<br><span style="color:#666">Type: ${typeLabel}</span>${regionLine}</div>`;
 
+      const makeMarker = (color) => {
+        if (isMobileDefault) {
+          const radius = MOBILE_TYPE_SIZES[place.type] ?? TYPE_STYLES[place.type]?.size ?? 4;
+          const fillColor = color || MOBILE_TYPE_COLORS[place.type] || '#555555';
+          return L.circleMarker([place.lat, place.lng], {
+            radius,
+            fillColor,
+            color: fillColor,
+            weight: 1,
+            fillOpacity: 1,
+            interactive: true,
+          });
+        }
+        return L.marker([place.lat, place.lng], {
+          icon: createNodeIcon(place.type, color),
+          interactive: true,
+        });
+      };
+
       // Waters go to their own toggle layer, always blue
       if (place.type === 'waters') {
-        const icon = createNodeIcon(place.type);
-        const marker = L.marker([place.lat, place.lng], { icon, interactive: true });
+        const marker = makeMarker(null);
         marker.bindPopup(popupContent);
         marker.addTo(watersLayer);
         continue;
@@ -278,10 +330,10 @@ export default function ViewMap() {
       const minZoom = ZOOM_TIERS[place.type] ?? 7;
       if (!markersByTier[minZoom]) markersByTier[minZoom] = L.layerGroup();
 
-      const icon = createNodeIcon(place.type, showRegions ? regionColor(place.region) : null);
-      const marker = L.marker([place.lat, place.lng], { icon, interactive: true });
+      const marker = makeMarker(null);
       marker.bindPopup(popupContent);
       marker.addTo(markersByTier[minZoom]);
+      placeMarkers.push({ marker, place });
 
       // Add label: use LABEL_TIERS zoom if defined, otherwise default to node zoom tier
       const labelZoom = LABEL_TIERS[place.type] ?? minZoom;
@@ -361,6 +413,8 @@ export default function ViewMap() {
       }
     }
 
+    placeMarkersRef.current = placeMarkers;
+
     // Re-apply waters visibility
     if (showWaters && !map.hasLayer(watersLayer)) map.addLayer(watersLayer);
 
@@ -388,7 +442,46 @@ export default function ViewMap() {
     return () => {
       map.off('zoomend', updateVisibility);
     };
-  }, [data, mapReady, showRegions]);
+  }, [data, mapReady]);
+
+  // Recolor markers + routes when showRegions toggles, without rebuilding
+  useEffect(() => {
+    if (!data || !mapReady) return;
+    const iconCache = iconCacheRef.current;
+    const regionColor = (regionId) =>
+      (regionId && data.regions?.[regionId]?.color) || NO_REGION_COLOR;
+    const getCachedIcon = (type, color) => {
+      const key = `${type}|${color || 'default'}`;
+      let icon = iconCache.get(key);
+      if (!icon) {
+        icon = createNodeIcon(type, color);
+        iconCache.set(key, icon);
+      }
+      return icon;
+    };
+
+    // Markers
+    for (const { marker, place } of placeMarkersRef.current) {
+      const color = showRegions ? regionColor(place.region) : null;
+      if (marker instanceof L.CircleMarker) {
+        const fillColor = color || MOBILE_TYPE_COLORS[place.type] || '#555555';
+        marker.setStyle({ fillColor, color: fillColor });
+      } else {
+        marker.setIcon(getCachedIcon(place.type, color));
+      }
+    }
+
+    // Routes
+    const newOpacity = showRegions ? 0.7 : 0.5;
+    for (const { polyline, startRegion, endRegion } of routeLinesRef.current) {
+      let color = ROUTE_COLOR;
+      if (showRegions) {
+        const sameRegion = startRegion && startRegion === endRegion;
+        color = sameRegion ? regionColor(startRegion) : (startRegion ? regionColor(startRegion) : ROUTE_COLOR);
+      }
+      polyline.setStyle({ color, opacity: newOpacity });
+    }
+  }, [showRegions, data, mapReady]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -547,12 +640,29 @@ export default function ViewMap() {
           </button>
           {mapKeyOpen && <>
             <div className="mt-1">
-              {LEGEND_TYPES.map(type => (
-                <div key={type} className="flex items-center gap-2 py-0.5">
-                  <span dangerouslySetInnerHTML={{ __html: legendSvg(type) }} />
-                  <span className="text-xs text-gray-700">{TYPE_LABELS[type]}</span>
-                </div>
-              ))}
+              {LEGEND_TYPES.map(type => {
+                const size = isMobileDefault
+                  ? (MOBILE_TYPE_SIZES[type] ?? TYPE_STYLES[type]?.size ?? 4)
+                  : (TYPE_STYLES[type]?.size || 4);
+                const diameter = size * 2;
+                return (
+                  <div key={type} className="flex items-center gap-2 py-0.5">
+                    {isMobileDefault ? (
+                      <span style={{
+                        display: 'inline-block',
+                        width: diameter,
+                        height: diameter,
+                        borderRadius: '50%',
+                        backgroundColor: MOBILE_TYPE_COLORS[type] || '#555',
+                        flexShrink: 0,
+                      }} />
+                    ) : (
+                      <span dangerouslySetInnerHTML={{ __html: legendSvg(type) }} />
+                    )}
+                    <span className="text-xs text-gray-700">{TYPE_LABELS[type]}</span>
+                  </div>
+                );
+              })}
               <div className="flex items-center gap-2 py-0.5">
                 <svg width="20" height="4" style={{ verticalAlign: 'middle' }}>
                   <line x1="0" y1="2" x2="20" y2="2" stroke="#5c3a1e" strokeWidth="1.5" opacity="0.5" />
