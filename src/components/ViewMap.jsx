@@ -22,41 +22,17 @@ const TILE_LAYERS = {
   },
 };
 
-// Shape + color + size per type (desktop uses shape differentiation)
+// Canvas circleMarker styling per type. Every color is unique so users can
+// distinguish types by color alone (no shape cues anymore).
 const TYPE_STYLES = {
-  metropoles: { shape: 'circle', color: '#000000', size: 6 },
-  capitals: { shape: 'square', color: '#333333', size: 5 },
-  towns: { shape: 'diamond', color: '#555555', size: 5 },
-  waystations: { shape: 'triangle', color: '#777777', size: 5 },
-  villages: { shape: 'circle', color: '#999999', size: 5 },
-  xroads: { shape: 'cross', color: '#888888', size: 5 },
-  waters: { shape: 'circle', color: '#4a90d9', size: 5 },
-  sites: { shape: 'circle', color: '#666666', size: 4 },
-};
-
-// Mobile: all nodes are circles, so color is the only distinguishing cue.
-// Every value below is unique. Keep in sync with the legend render below.
-const MOBILE_TYPE_COLORS = {
-  metropoles: '#000000',
-  capitals: '#222222',
-  towns: '#444444',
-  waystations: '#666666',
-  villages: '#888888',
-  xroads: '#999999',
-  waters: '#aaaaaa',
-  sites: '#cccccc',
-};
-
-// Mobile-specific radii for circleMarkers and legend swatches (independent of TYPE_STYLES.size).
-const MOBILE_TYPE_SIZES = {
-  metropoles: 5,
-  capitals: 4,
-  towns: 4,
-  waystations: 4,
-  villages: 4,
-  waters: 4,
-  xroads: 4,
-  sites: 4,
+  metropoles:  { color: '#000000', size: 5 },
+  capitals:    { color: '#222222', size: 5 },
+  towns:       { color: '#444444', size: 4 },
+  waystations: { color: '#666666', size: 3 },
+  villages:    { color: '#888888', size: 3 },
+  xroads:      { color: '#999999', size: 3 },
+  waters:      { color: '#6BA3BE', size: 3 },
+  sites:       { color: '#cccccc', size: 3 },
 };
 
 // Display names for legend
@@ -95,44 +71,6 @@ const LABEL_TIERS = {
   sites: 9,
 };
 
-function buildSvgShape(shape, size, color) {
-  const s = size * 2;
-  let svg;
-  if (shape === 'square') {
-    svg = `<rect x="1" y="1" width="${s - 2}" height="${s - 2}" fill="${color}" stroke="${color}" stroke-width="1"/>`;
-  } else if (shape === 'diamond') {
-    const mid = s / 2;
-    svg = `<polygon points="${mid},1 ${s - 1},${mid} ${mid},${s - 1} 1,${mid}" fill="${color}" stroke="${color}" stroke-width="1"/>`;
-  } else if (shape === 'triangle') {
-    const mid = s / 2;
-    svg = `<polygon points="${mid},1 ${s - 1},${s - 1} 1,${s - 1}" fill="${color}" stroke="${color}" stroke-width="1"/>`;
-  } else if (shape === 'cross') {
-    const mid = s / 2;
-    const t = Math.max(1, s / 6);
-    svg = `<rect x="${mid - t}" y="1" width="${t * 2}" height="${s - 2}" fill="${color}"/><rect x="1" y="${mid - t}" width="${s - 2}" height="${t * 2}" fill="${color}"/>`;
-  } else {
-    svg = `<circle cx="${s / 2}" cy="${s / 2}" r="${s / 2 - 1}" fill="${color}" stroke="${color}" stroke-width="1"/>`;
-  }
-  return { svgInner: svg, s };
-}
-
-function createNodeIcon(type, colorOverride) {
-  const style = TYPE_STYLES[type] || { shape: 'circle', color: '#555555', size: 3 };
-  const color = colorOverride || style.color;
-  const { svgInner, s } = buildSvgShape(style.shape, style.size, color);
-  const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}">${svgInner}</svg>`;
-  const url = 'data:image/svg+xml;base64,' + btoa(svgStr);
-  return L.icon({ iconUrl: url, iconSize: [s, s], iconAnchor: [s / 2, s / 2] });
-}
-
-// Build an inline SVG string for the legend
-function legendSvg(type) {
-  const style = TYPE_STYLES[type];
-  if (!style) return '';
-  const { svgInner, s } = buildSvgShape(style.shape, style.size, style.color);
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" style="vertical-align:middle">${svgInner}</svg>`;
-}
-
 export default function ViewMap() {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -144,7 +82,6 @@ export default function ViewMap() {
   const bordersLayerRef = useRef(null);
   const placeMarkersRef = useRef([]); // [{ marker, place }]
   const routeLinesRef = useRef([]); // [{ polyline, startRegion, endRegion }]
-  const iconCacheRef = useRef(new Map());
   const [data, setData] = useState(null);
   const [activeLayer, setActiveLayer] = useState('terrain');
   const [showWaters, setShowWaters] = useState(false);
@@ -301,25 +238,19 @@ export default function ViewMap() {
       const popupContent = `<div style="font-size:14px"><strong>${displayName}</strong>${place.nameAr ? `<br><span dir="rtl" style="font-size:18px;font-family:'Noto Naskh Arabic',serif;line-height:1.6">${place.nameAr}</span>` : ''}<br><span style="color:#666">Type: ${typeLabel}</span>${regionLine}</div>`;
 
       const makeMarker = (color) => {
-        if (isMobileDefault) {
-          const radius = MOBILE_TYPE_SIZES[place.type] ?? TYPE_STYLES[place.type]?.size ?? 4;
-          const fillColor = color || MOBILE_TYPE_COLORS[place.type] || '#555555';
-          return L.circleMarker([place.lat, place.lng], {
-            radius,
-            fillColor,
-            color: fillColor,
-            weight: 1,
-            fillOpacity: 1,
-            interactive: true,
-          });
-        }
-        return L.marker([place.lat, place.lng], {
-          icon: createNodeIcon(place.type, color),
+        const style = TYPE_STYLES[place.type] || { size: 4, color: '#555555' };
+        const fillColor = color || style.color;
+        return L.circleMarker([place.lat, place.lng], {
+          radius: style.size,
+          fillColor,
+          color: fillColor,
+          weight: 1,
+          fillOpacity: 1,
           interactive: true,
         });
       };
 
-      // Waters go to their own toggle layer, always blue
+      // Waters go to their own toggle layer
       if (place.type === 'waters') {
         const marker = makeMarker(null);
         marker.bindPopup(popupContent);
@@ -447,28 +378,14 @@ export default function ViewMap() {
   // Recolor markers + routes when showRegions toggles, without rebuilding
   useEffect(() => {
     if (!data || !mapReady) return;
-    const iconCache = iconCacheRef.current;
     const regionColor = (regionId) =>
       (regionId && data.regions?.[regionId]?.color) || NO_REGION_COLOR;
-    const getCachedIcon = (type, color) => {
-      const key = `${type}|${color || 'default'}`;
-      let icon = iconCache.get(key);
-      if (!icon) {
-        icon = createNodeIcon(type, color);
-        iconCache.set(key, icon);
-      }
-      return icon;
-    };
 
-    // Markers
+    // Markers: canvas circleMarkers, just swap fill + stroke colors
     for (const { marker, place } of placeMarkersRef.current) {
-      const color = showRegions ? regionColor(place.region) : null;
-      if (marker instanceof L.CircleMarker) {
-        const fillColor = color || MOBILE_TYPE_COLORS[place.type] || '#555555';
-        marker.setStyle({ fillColor, color: fillColor });
-      } else {
-        marker.setIcon(getCachedIcon(place.type, color));
-      }
+      const override = showRegions ? regionColor(place.region) : null;
+      const fillColor = override || TYPE_STYLES[place.type]?.color || '#555555';
+      marker.setStyle({ fillColor, color: fillColor });
     }
 
     // Routes
@@ -641,24 +558,18 @@ export default function ViewMap() {
           {mapKeyOpen && <>
             <div className="mt-1">
               {LEGEND_TYPES.map(type => {
-                const size = isMobileDefault
-                  ? (MOBILE_TYPE_SIZES[type] ?? TYPE_STYLES[type]?.size ?? 4)
-                  : (TYPE_STYLES[type]?.size || 4);
-                const diameter = size * 2;
+                const style = TYPE_STYLES[type] || { size: 4, color: '#555' };
+                const diameter = style.size * 2;
                 return (
                   <div key={type} className="flex items-center gap-2 py-0.5">
-                    {isMobileDefault ? (
-                      <span style={{
-                        display: 'inline-block',
-                        width: diameter,
-                        height: diameter,
-                        borderRadius: '50%',
-                        backgroundColor: MOBILE_TYPE_COLORS[type] || '#555',
-                        flexShrink: 0,
-                      }} />
-                    ) : (
-                      <span dangerouslySetInnerHTML={{ __html: legendSvg(type) }} />
-                    )}
+                    <span style={{
+                      display: 'inline-block',
+                      width: diameter,
+                      height: diameter,
+                      borderRadius: '50%',
+                      backgroundColor: style.color,
+                      flexShrink: 0,
+                    }} />
                     <span className="text-xs text-gray-700">{TYPE_LABELS[type]}</span>
                   </div>
                 );
