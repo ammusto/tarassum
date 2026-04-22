@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import L from 'leaflet';
-import { loadData } from '../data/loader.js';
+import { loadData, searchPlaces } from '../data/loader.js';
 
 const TILE_LAYERS = {
   terrain: {
@@ -94,6 +94,55 @@ export default function ViewMap() {
   const [zoomLevelsOpen, setZoomLevelsOpen] = useState(!isMobileDefault);
   const [mapSettingsOpen, setMapSettingsOpen] = useState(!isMobileDefault);
   const [mapReady, setMapReady] = useState(false);
+
+  // Search Map state
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [searchTypeFilter, setSearchTypeFilter] = useState('all');
+  const [searchRegionFilter, setSearchRegionFilter] = useState('all');
+  const searchInputRef = useRef(null);
+  const searchDropdownRef = useRef(null);
+
+  const SEARCH_TYPE_OPTIONS = ['all', 'metropoles', 'capitals', 'towns', 'waystations', 'villages', 'xroads', 'waters', 'sites'];
+
+  const regionKeys = useMemo(
+    () => (data ? Object.keys(data.regions).sort() : []),
+    [data]
+  );
+
+  // Search effect
+  useEffect(() => {
+    if (!searchQuery || searchQuery.length < 1) { setSearchResults([]); return; }
+    let res = searchPlaces(searchQuery, 50).filter(p => p.type !== 'regions' && p.type !== 'quarters');
+    if (searchTypeFilter !== 'all') res = res.filter(p => p.type === searchTypeFilter);
+    if (searchRegionFilter !== 'all') res = res.filter(p => p.region === searchRegionFilter);
+    setSearchResults(res.slice(0, 30));
+    setShowSearchDropdown(true);
+  }, [searchQuery, searchTypeFilter, searchRegionFilter]);
+
+  // Close search dropdown on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (searchDropdownRef.current && !searchDropdownRef.current.contains(e.target) &&
+          searchInputRef.current && !searchInputRef.current.contains(e.target)) {
+        setShowSearchDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleSearchSelect = (place) => {
+    const map = mapInstanceRef.current;
+    if (map && place.lat != null && place.lng != null) {
+      map.flyTo([place.lat, place.lng], 9, { duration: 0.8 });
+    }
+    setSearchQuery('');
+    setSearchResults([]);
+    setShowSearchDropdown(false);
+  };
 
   useEffect(() => {
     loadData().then(d => setData(d));
@@ -449,6 +498,67 @@ export default function ViewMap() {
       >
         {fullscreen ? 'Exit Full Screen' : 'Full Screen'}
       </button>
+      {/* Search Map - collapsible panel below fullscreen button */}
+      {data && (
+        <div className="absolute top-10 left-2 z-[1001] bg-white rounded shadow border border-gray-200 p-2" style={{ width: searchOpen ? '19rem' : 'auto' }}>
+          <button
+            onClick={() => setSearchOpen(v => !v)}
+            className="flex items-center justify-between w-full text-xs font-medium text-gray-500 hover:text-gray-700 cursor-pointer"
+          >
+            <span>Search Map</span>
+            <span className="text-gray-400 ml-3">{searchOpen ? '▾' : '▸'}</span>
+          </button>
+          {searchOpen && (
+            <div className="mt-1.5">
+              <div className="relative">
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  onFocus={() => { if (searchResults.length) setShowSearchDropdown(true); }}
+                  placeholder="Search places..."
+                  className="w-full text-gray-800 text-sm rounded px-3 py-2 border border-gray-200 focus:border-blue-400 focus:outline-none placeholder:text-gray-400"
+                />
+                {showSearchDropdown && searchResults.length > 0 && (
+                  <div ref={searchDropdownRef} className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg max-h-72 overflow-y-auto z-50">
+                    {searchResults.map(place => (
+                      <button
+                        key={place.id}
+                        onClick={() => handleSearchSelect(place)}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-100 border-b border-gray-100 last:border-0 cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm text-gray-800 truncate">{place.ijmes_cornuData || place.ijmes_name || place.name}</span>
+                          <span className="text-sm text-gray-500 truncate" dir="rtl">{place.nameAr}</span>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {place.type} · {data.regions[place.region]?.display || place.region}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2 mt-1">
+                <select value={searchTypeFilter} onChange={e => setSearchTypeFilter(e.target.value)}
+                  className="flex-1 min-w-0 bg-white text-gray-700 text-xs rounded px-2 py-1.5 border border-gray-200">
+                  {SEARCH_TYPE_OPTIONS.map(t => (
+                    <option key={t} value={t}>{t === 'all' ? 'All types' : t}</option>
+                  ))}
+                </select>
+                <select value={searchRegionFilter} onChange={e => setSearchRegionFilter(e.target.value)}
+                  className="flex-1 min-w-0 bg-white text-gray-700 text-xs rounded px-2 py-1.5 border border-gray-200">
+                  <option value="all">All regions</option>
+                  {regionKeys.map(k => (
+                    <option key={k} value={k}>{data.regions[k]?.display || k}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       {!data && (
         <div className="absolute inset-0 z-[999] flex items-center justify-center bg-white">
           <div className="text-sm text-gray-500">Loading gazetteer data...</div>
